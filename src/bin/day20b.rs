@@ -159,21 +159,77 @@ impl Tile {
     }
 }
 
-fn find_pattern(map: &Vec<Vec<bool>>, pat: &Vec<(usize, usize)>) -> usize {
+fn debug_map(map: &HashMap<(i32, i32), OrientedTile>, tiles: &Vec<Tile>) {
+    let min_x = map.keys().map(|k| k.0).min().unwrap();
+    let min_y = map.keys().map(|k| k.1).min().unwrap();
+    let max_x = map.keys().map(|k| k.0).max().unwrap();
+    let max_y = map.keys().map(|k| k.1).max().unwrap();
+
+    let mut s = String::new();
+    for y in min_y..=max_y {
+        for dy in 0..10 {
+            for x in min_x..=max_x {
+                if let Some(tile) = map.get(&(x, y)) {
+                    let orientation = -tile.orientation;
+                    for dx in 0..10 {
+                        let pos = orientation.apply_tile((dx, dy));
+                        if tiles[tile.index].data[pos.1][pos.0] {
+                            s += "#";
+                        } else {
+                            s += ".";
+                        }
+                    }
+                } else {
+                    for _ in 0..10 {
+                        s += " ";
+                    }
+                }
+                s += "  "
+            }
+            s += "\n";
+        }
+        s += "\n";
+    }
+    println!("{}\n-", s);
+}
+
+fn debug_map2(map: &Vec<Vec<MapState>>) {
+    let mut s = String::new();
+    for line in map {
+        for column in line {
+            s += match column {
+                MapState::Empty => "\x1b[90m.\x1b[0m",
+                MapState::Filled => "\x1b[90m█\x1b[0m",
+                MapState::Monster => "\x1b[92m█\x1b[0m",
+            }
+        }
+        s += "\n";
+    }
+    println!("{}", s);
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum MapState {
+    Empty,
+    Filled,
+    Monster,
+}
+
+fn mark_patterns(map: &mut Vec<Vec<MapState>>, pat: &Vec<(usize, usize)>) {
     let pat_w = pat.iter().map(|p| p.0).max().unwrap() + 1;
     let pat_h = pat.iter().map(|p| p.1).max().unwrap() + 1;
-    let mut count = 0;
     for y in 0..map.len() - pat_h {
         'next: for x in 0..map[0].len() - pat_w {
             for (dx, dy) in pat {
-                if !map[y + dy][x + dx] {
+                if map[y + dy][x + dx] != MapState::Filled {
                     continue 'next;
                 }
             }
-            count += 1;
+            for (dx, dy) in pat {
+                map[y + dy][x + dx] = MapState::Monster;
+            }
         }
     }
-    count
 }
 
 fn main() {
@@ -222,6 +278,7 @@ fn main() {
     );
     let mut tile_queue = vec![(0, 0)];
     while let Some(pos) = tile_queue.pop() {
+        debug_map(&positioned_tiles, &tiles);
         let positioned_tile = positioned_tiles[&pos];
         for edge in tiles[positioned_tile.index].edges().iter().copied() {
             let orientation = -edge.orientation + positioned_tile.orientation;
@@ -263,7 +320,7 @@ fn main() {
 
     let positioned_tiles = &positioned_tiles;
     let tiles = &tiles;
-    let full_map = (min_y..=max_y)
+    let mut full_map = (min_y..=max_y)
         .flat_map(|y| {
             (1..9).map(move |dy| {
                 (min_x..=max_x)
@@ -272,7 +329,11 @@ fn main() {
                         let orientation = -tile.orientation;
                         (1..9).map(move |dx| {
                             let pos = orientation.apply_tile((dx, dy));
-                            tiles[tile.index].data[pos.1][pos.0]
+                            if tiles[tile.index].data[pos.1][pos.0] {
+                                MapState::Filled
+                            } else {
+                                MapState::Empty
+                            }
                         })
                     })
                     .collect::<Vec<_>>()
@@ -292,8 +353,13 @@ fn main() {
         })
         .collect();
 
-    let count = find_pattern(&full_map, &sea_monster_pat);
-    let total = full_map.iter().flatten().filter(|&&b| b).count();
-    let res = total - count * sea_monster_pat.len();
+    mark_patterns(&mut full_map, &sea_monster_pat);
+    debug_map2(&full_map);
+
+    let res = full_map
+        .iter()
+        .flatten()
+        .filter(|&&b| b == MapState::Filled)
+        .count();
     println!("{}", res);
 }

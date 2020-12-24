@@ -98,6 +98,31 @@ fn step(src: &HashSet<Coord>, dst: &mut HashSet<Coord>) {
     }
 }
 
+fn print(src: &HashSet<Coord>) {
+    fn to_xy(coord: Coord) -> (i32, i32) {
+        (coord.a * 2 + coord.b, coord.b)
+    }
+
+    let coords: HashSet<_> = src.iter().copied().map(to_xy).collect();
+    let min_x = coords.iter().map(|&(x, _)| x).min().unwrap();
+    let min_y = coords.iter().map(|&(_, y)| y).min().unwrap();
+    let max_x = coords.iter().map(|&(x, _)| x).max().unwrap();
+    let max_y = coords.iter().map(|&(_, y)| y).max().unwrap();
+
+    let mut res = String::new();
+    for y in min_y..=max_y {
+        for x in min_x..=max_x {
+            if coords.contains(&(x, y)) || coords.contains(&(x - 1, y)) {
+                res += " "
+            } else {
+                res += "█"
+            }
+        }
+        res += "\n";
+    }
+    println!("{}", res);
+}
+
 fn main() {
     let mut black_tiles = HashSet::new();
     for line in INPUT.lines() {
@@ -109,9 +134,12 @@ fn main() {
     let mut black_tiles2 = black_tiles.clone();
 
     for _ in 0..100 {
+        print(&black_tiles);
         step(&black_tiles, &mut black_tiles2);
         mem::swap(&mut black_tiles, &mut black_tiles2);
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    print(&black_tiles);
 
     println!("{}", black_tiles.len());
 }
